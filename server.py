@@ -57,7 +57,8 @@ def handle_client(conn, p_id):
         players[p_id] = {
             'x': -1000, 'y': -1000, 
             'name': 'Guest', 'hp': 10, 'max_hp': 10, 'lv': 1.0, 
-            'point': 0, 'dead': False 
+            'point': 0, 'dead': False,
+            'ba': 0, 'ta': 0, 'c': (150, 150, 150) # 기본값 추가
         }
         client_connections.append(conn)
 
@@ -91,6 +92,7 @@ def handle_client(conn, p_id):
                         if me['is_dead']: players[p_id]['dead'] = True
 
                 if 'new_bullets' in recv_data:
+                    print(f"--- Player {p_id} fired {len(recv_data['new_bullets'])} bullets! ---") # 디버그 출력 추가
                     for b in recv_data['new_bullets']:
                         b['p_id'] = p_id
                         b['time'] = current_time
@@ -180,11 +182,15 @@ def handle_client(conn, p_id):
             
             # 5. 브로드캐스팅 (락 외부에서)
             disconnected_clients = []
-            for client_conn in list(client_connections):
-                try:
-                    client_conn.send(pickle.dumps(reply_data))
-                except socket.error:
-                    disconnected_clients.append(client_conn)
+            if reply_data:
+                pickled_data = pickle.dumps(reply_data)
+                header = len(pickled_data).to_bytes(4, 'big')
+
+                for client_conn in list(client_connections):
+                    try:
+                        client_conn.send(header + pickled_data)
+                    except socket.error:
+                        disconnected_clients.append(client_conn)
             
             if disconnected_clients:
                 with data_lock:
@@ -216,3 +222,5 @@ def main():
         conn, _ = server.accept()
         threading.Thread(target=handle_client, args=(conn, cid)).start()
         cid += 1
+if __name__ == "__main__":
+        main()

@@ -6,7 +6,7 @@ import pickle
 import time
 
 WIDTH, HEIGHT = 800, 600
-HOST = '3.36.32.202'
+HOST = '52.79.106.125'
 PORT = 5555
 
 # 색상
@@ -52,8 +52,23 @@ class Network:
     def send(self, data):
         try:
             self.client.send(pickle.dumps(data))
-            return pickle.loads(self.client.recv(8192))
-        except: return None
+            
+            # 1. 헤더(데이터 크기) 수신
+            header = self.client.recv(4)
+            if not header: return None
+            data_size = int.from_bytes(header, 'big')
+            
+            # 2. 실제 데이터 수신
+            full_data = b''
+            while len(full_data) < data_size:
+                chunk = self.client.recv(8192)
+                if not chunk: return None
+                full_data += chunk
+            
+            return pickle.loads(full_data)
+        except socket.error as e:
+            print(e)
+            return None
 
 def draw_tombstone(surface, x, y, name):
     pygame.draw.rect(surface, GRAY, (x - 15, y - 20, 30, 40))
@@ -308,12 +323,13 @@ def main():
                 'respawn_req': my_tank.respawn_req 
             }
         }
-        my_tank.net_actions.clear() # 충돌 감지 로직이 사라졌으므로 매번 초기화
         data.update(my_tank.net_actions)
         my_tank.respawn_req = False
 
         state = n.send(data)
         if not state: break
+        
+        my_tank.net_actions.clear() # 데이터를 보낸 후 초기화
 
         s_players = state['players']
         obstacles = state['obstacles']
