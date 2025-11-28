@@ -3,6 +3,7 @@ import math
 import random
 import socket
 import pickle
+from collections import deque
 
 WIDTH, HEIGHT = 800, 600
 HOST = '52.79.106.125' 
@@ -281,6 +282,9 @@ class Player:
         self.speed = 4
         self.lv = 1.0
         self.has_spawned = False # 스폰 여부 플래그
+        self.shoot_cooldown = 300 # 300ms
+        self.last_shot_time = 0
+        self.trail_positions = deque(maxlen=15)
 
     def move(self, keys, obstacles, other_players):
         if self.is_dead or not self.has_spawned: return
@@ -339,9 +343,14 @@ class Player:
         
         self.x = max(0, min(WIDTH, self.x))
         self.y = max(0, min(HEIGHT, self.y))
+        
+        if dx != 0 or dy != 0:
+            self.trail_positions.append((self.x, self.y, self.ba))
 
     def shoot(self):
-        if not self.is_dead and self.has_spawned:
+        now = pygame.time.get_ticks()
+        if not self.is_dead and self.has_spawned and now - self.last_shot_time > self.shoot_cooldown:
+            self.last_shot_time = now
             self.bullets_q.append({'x': self.x, 'y': self.y, 'angle': self.ta, 'color': self.color})
 
 def main():
@@ -403,6 +412,28 @@ def main():
             me.lv = my_state['lv']
 
         screen.fill((240, 240, 245))
+
+        # 0. 잔상 효과 (점선 바퀴 자국)
+        if not me.is_dead and len(me.trail_positions) > 1:
+            scale = 1 + (me.lv * 0.1)
+            size = 40 * min(scale, 3.0)
+            track_offset = size * 0.35
+            
+            for i, (tx, ty, t_ba) in enumerate(me.trail_positions):
+                trail_color = (210, 210, 215) # 자국 색상
+
+                # 탱크의 방향에 수직인 벡터 계산 (바퀴 축)
+                axle_rad = math.radians(t_ba + 90)
+                dx = track_offset * math.cos(axle_rad)
+                dy = -track_offset * math.sin(axle_rad)
+                
+                # 왼쪽 및 오른쪽 바퀴 위치
+                left_pos = (int(tx + dx), int(ty + dy))
+                right_pos = (int(tx - dx), int(ty - dy))
+
+                # 점선(원) 그리기
+                pygame.draw.circle(screen, trail_color, left_pos, 2)
+                pygame.draw.circle(screen, trail_color, right_pos, 2)
 
         # 1. 장애물
         for obs in state['obstacles']:

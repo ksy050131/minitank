@@ -104,15 +104,16 @@ def game_logic_thread():
                         hit = True
                         
                         if obs['hp'] <= 0:
-                            # 장애물 파괴 이벤트
-                            game_state['explosions'].append({'x': obs['x'], 'y': obs['y'], 'r': obs['r'], 'type': 'obs', 'time': now})
+                            # 장애물 파괴 이벤트 (폭발 범위 추가 감소)
+                            game_state['explosions'].append({'x': obs['x'], 'y': obs['y'], 'r': obs['r'] // 4, 'type': 'obs', 'time': now})
                             
                             # 보상: 장애물 크기만큼 LV 추가 (최대 3)
                             if attacker:
                                 gain = obs['reward_lv']
                                 attacker['lv'] += gain
                                 update_player_stats(attacker)
-                                attacker['hp'] = min(attacker['hp'] + 5, attacker['max_hp']) # 소량 회복
+                                # 레벨업 시 체력 100% 회복
+                                attacker['hp'] = attacker['max_hp'] # min(attacker['hp'] + (attacker['hp'] * 0.25), attacker['max_hp'])
 
                             game_state['obstacles'].pop(i)
                             new_obs = spawn_obstacle()
@@ -151,8 +152,8 @@ def game_logic_thread():
                                 if xp_gain < 1: xp_gain = 1 # 최소 1은 보장
                                 attacker['lv'] += xp_gain
                                 update_player_stats(attacker)
-                                # 처치 시 체력 대폭 회복
-                                attacker['hp'] = min(attacker['hp'] + attacker['max_hp']*0.3, attacker['max_hp'])
+                                # 레벨업 시 체력 100% 회복
+                                attacker['hp'] = attacker['max_hp'] # min(attacker['hp'] + (attacker['hp'] * 0.25), attacker['max_hp'])
                                 
                                 log_msg = f"{attacker['name']}(Lv.{int(attacker['lv'])}) 처치 -> {p['name']}(Lv.{int(p['lv'])})"
                                 game_state['kill_logs'].append({'msg': log_msg, 'time': now + 4})
